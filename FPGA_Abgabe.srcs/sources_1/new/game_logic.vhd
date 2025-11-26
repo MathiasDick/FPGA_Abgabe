@@ -6,7 +6,10 @@ use work.constants_pkg.all; -- Imports constants and state_type
 entity game_logic is
     Port ( clk_pxl   : in  STD_LOGIC;
            rst       : in  STD_LOGIC; -- Mapped to sw(0) in top
-           btn       : in  STD_LOGIC_VECTOR(3 downto 0);
+           LEFT_P_UP : in STD_LOGIC;
+           LEFT_P_DOWN : in STD_LOGIC;
+           RIGHT_P_UP : in STD_LOGIC;
+           RIGHT_P_DOWN : in STD_LOGIC;
            
            -- Outputs to the Renderer
            ball_x    : out STD_LOGIC_VECTOR(11 downto 0);
@@ -85,23 +88,24 @@ begin
                 case state is
                     ---------------------------------------------------------
                     when IDLE =>
-                        if btn /= "0000" then state <= SERVE; end if;
+                        if (LEFT_P_UP /= '0' or LEFT_P_DOWN /= '0' or RIGHT_P_UP /= '0' or RIGHT_P_DOWN /= '0') then state <= SERVE; end if;
                     ---------------------------------------------------------
                     when SERVE =>
                         -- Center Ball
                         b_x <= 960; 
                         b_y <= 540;
                         -- Launch on Up Button
-                        if btn(3)='1' or btn(1)='1' then state <= PLAY; end if;
+                        if LEFT_P_UP = '1' or LEFT_P_DOWN = '1' or RIGHT_P_UP = '1' or RIGHT_P_DOWN = '1' then state <= PLAY; 
+                        end if;
                     ---------------------------------------------------------
                     when PLAY =>
                         -- 1. PADDLE MOVEMENT
                         -- Left
-                        if btn(1) = '1' and pl_y > 20 then pl_y <= pl_y - 4; end if;
-                        if btn(0) = '1' and pl_y < 900 then pl_y <= pl_y + 4; end if;
+                        if LEFT_P_UP = '1' and pl_y > 20 then pl_y <= pl_y - 4; end if;
+                        if LEFT_P_DOWN = '1' and pl_y < 900 then pl_y <= pl_y + 4; end if;
                         -- Right
-                        if btn(3) = '1' and pr_y > 20 then pr_y <= pr_y - 4; end if;
-                        if btn(2) = '1' and pr_y < 900 then pr_y <= pr_y + 4; end if;
+                        if RIGHT_P_UP = '1' and pr_y > 20 then pr_y <= pr_y - 4; end if;
+                        if RIGHT_P_DOWN = '1' and pr_y < 900 then pr_y <= pr_y + 4; end if;
                         
                         -- 2. BALL Y MOVEMENT (Bouncing off top/bottom)
                         if b_dy = '1' then -- Down
@@ -153,13 +157,6 @@ begin
                                 b_x <= b_x - 3; -- Continue
                             end if;
                         end if;
-                    ---------------------------------------------------------
-                    when GAMEOVER =>
-                        if btn = "1111" then 
-                            state <= IDLE; 
-                            lives_reg <= 3; sc_l <= 0; sc_r <= 0; 
-                        end if;
-                    ---------------------------------------------------------
                 end case;
             end if;
         end if;

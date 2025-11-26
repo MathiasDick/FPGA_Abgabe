@@ -20,8 +20,10 @@ entity top is
     Port ( 
            CLK_I : in  STD_LOGIC; -- System Clock (100 MHz)
            
-           -- Buttons: [3] Right Up, [2] Right Down, [1] Left Up, [0] Left Down
-           btn   : in  STD_LOGIC_VECTOR (3 downto 0);
+           LEFT_P_UP : in STD_LOGIC;
+           LEFT_P_DOWN : in STD_LOGIC;
+           RIGHT_P_UP : in STD_LOGIC;
+           RIGHT_P_DOWN : in STD_LOGIC;
            
            -- Switch: [0] Reset / Force Welcome Screen
            sw    : in  STD_LOGIC_VECTOR (0 downto 0); 
@@ -133,7 +135,10 @@ begin
     port map (
         clk_pxl   => pxl_clk,
         rst       => sw(0),      -- Map Switch 0 to Reset
-        btn       => btn,        -- Map Buttons
+        LEFT_P_UP       => LEFT_P_UP,        -- Map Buttons
+        LEFT_P_DOWN     => LEFT_P_DOWN,
+        RIGHT_P_UP      => RIGHT_P_UP,
+        RIGHT_P_DOWN    => RIGHT_P_DOWN,
         
         -- Outputs (Driving the wires)
         ball_x    => ball_x,

@@ -68,7 +68,10 @@ package constants_pkg is
     component game_logic
     Port ( clk_pxl   : in  STD_LOGIC;
            rst       : in  STD_LOGIC;
-           btn       : in  STD_LOGIC_VECTOR(3 downto 0);
+           LEFT_P_UP : in STD_LOGIC;
+           LEFT_P_DOWN : in STD_LOGIC;
+           RIGHT_P_UP : in STD_LOGIC;
+           RIGHT_P_DOWN : in STD_LOGIC;
            ball_x    : out STD_LOGIC_VECTOR(11 downto 0);
            ball_y    : out STD_LOGIC_VECTOR(11 downto 0);
            pad_l_y   : out STD_LOGIC_VECTOR(11 downto 0);
