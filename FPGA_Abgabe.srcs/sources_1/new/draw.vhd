@@ -19,7 +19,7 @@ entity draw is
            lives    : in  integer;
            
            -- NEW: We need to know the state to change background color!
-           -- 0=IDLE, 1=PLAY/SERVE, 2=GAMEOVER
+           -- 0=WELCOME, 1=PLAY/SERVE, 2=GAMEOVER
            game_state : in state_type; 
 
            -- RGB Output
@@ -30,18 +30,167 @@ end draw;
 
 architecture Behavioral of draw is
 
-    -- INTERNAL SIGNALS (Integer versions of inputs for easier math)
+    -- "Welcome" Values
+    constant CHAR_WIDTH  : natural := 32;
+    constant LETTERS     : natural := 7;
+    constant WORD_WIDTH  : natural := CHAR_WIDTH * LETTERS;
+    
+    -- "Game Over" Values
+    constant GO_LETTERS  : natural := 9; -- "GAME OVER" is 9 chars (including space)
+    constant GO_WIDTH    : natural := CHAR_WIDTH * GO_LETTERS;
+    constant GO_X        : natural := (FRAME_WIDTH - GO_WIDTH) / 2;
+    
+    constant WELCOME_X : natural := (FRAME_WIDTH - WORD_WIDTH) / 2;
+    
+    constant L_SIZE    : integer := 20;  -- 16x16 pixel squares
+    constant L_Y_START : integer := 57;  -- Vertical Position
+    constant L_GAP     : integer := 25;  -- Distance between balls
+    
+    constant L_X_START   : integer := (FRAME_WIDTH - ((2 * L_GAP) + L_SIZE)) / 2;
+
+
+    -- 1. DEFINE FONT TYPES AND CONSTANTS (The "Visual" Bitmap)
+    type char_bitmap_type is array (0 to 7) of std_logic_vector(7 downto 0);
+    type font_rom_type is array (0 to 15) of char_bitmap_type;
+
+    constant FONT_ROM : font_rom_type := (
+        0 =>   ("00111100", 
+                "01100110", 
+                "01100110", 
+                "01100110", 
+                "01100110", 
+                "01100110", 
+                "00111100", 
+                "00000000"),
+                
+        1 =>   ("00011000", 
+                "00111000", 
+                "00011000", 
+                "00011000", 
+                "00011000", 
+                "00011000", 
+                "00111110", 
+                "00000000"),
+                
+        2 =>   ("00111100", 
+                "01100110", 
+                "00000110", 
+                "00001100", 
+                "00110000", 
+                "01100000", 
+                "01111110", 
+                "00000000"),
+                
+        3 =>   ("00111100", 
+                "01100110", 
+                "00000110", 
+                "00011100", 
+                "00000110", 
+                "01100110", 
+                "00111100", 
+                "00000000"),
+                
+        4 =>  ("11000110", 
+               "11000110", 
+               "11000110", 
+               "11010110", 
+               "11111110", 
+               "11101110", 
+               "11000110", 
+               "00000000"), --W
+                
+        5 =>  ("11111110", 
+               "11000000", 
+               "11000000", 
+               "11111100", 
+               "11000000", 
+               "11000000", 
+               "11111110", 
+               "00000000"), --E
+                
+        6 =>  ("11000000", 
+               "11000000", 
+               "11000000", 
+               "11000000", 
+               "11000000", 
+               "11000000", 
+               "11111110", 
+               "00000000"), --L
+                
+        7 =>  ("01111110", 
+               "11000010", 
+               "11000000", 
+               "11000000", 
+               "11000000", 
+               "11000010", 
+               "01111110", 
+               "00000000"), --C
+                
+        8 =>  ("01111100", 
+               "11000110", 
+               "11000110", 
+               "11000110", 
+               "11000110", 
+               "11000110", 
+               "01111100", 
+               "00000000"), --O
+                
+        9 =>  ("11000110", 
+               "11101110", 
+               "11111110", 
+               "11010110", 
+               "11000110", 
+               "11000110", 
+               "11000110", 
+               "00000000"), --M
+   
+        10 => ("01111110", 
+               "11000010", 
+               "11000000", 
+               "11001110", 
+               "11000110", 
+               "11000110", 
+               "01111110", 
+               "00000000"), --G
+    
+        11 => ("01111100", 
+               "11000110", 
+               "11000110", 
+               "11111110", 
+               "11000110", 
+               "11000110", 
+               "11000110", 
+               "00000000"), --A
+    
+        12 => ("11000110", 
+               "11000110", 
+               "11000110", 
+               "01101100", 
+               "01101100", 
+               "00111000", 
+               "00010000", 
+               "00000000"), --V
+    
+        13 => ("11111100", 
+               "11000110", 
+               "11000110", 
+               "11111100", 
+               "11110000", 
+               "11011000", 
+               "11001110", 
+               "00000000"), --R
+                        
+        others => (others => (others => '0'))
+    );
+
+    -- INTERNAL SIGNALS
     signal pix_x, pix_y : integer;
     signal b_x, b_y     : integer;
     signal pl_y, pr_y   : integer;
 
-    -- DRAW FLAGS (True if pixel is inside object)
+    -- DRAW FLAGS
     signal draw_ball, draw_pad_l, draw_pad_r, draw_lives : std_logic;
     signal draw_text : std_logic;
-
-    -- TEXT ENGINE SIGNALS
-    signal char_selection : integer range 0 to 15 := 0; 
-    signal char_line_bits : std_logic_vector(7 downto 0); 
 
 begin
 
@@ -68,91 +217,129 @@ begin
     draw_pad_r <= '1' when (pix_x >= (FRAME_WIDTH - PADDLE_OFFSET - PADDLE_W) and pix_x < (FRAME_WIDTH - PADDLE_OFFSET)) and
                            (pix_y >= pr_y and pix_y < pr_y + PADDLE_H) else '0';
 
-    -- Life Bar (Green bar at top)
-    draw_lives <= '1' when (pix_y > 50 and pix_y < 80) and
-                           (pix_x > 900 and pix_x < 900 + (lives * 50)) else '0';
+    -- Live Balls
+    draw_lives <= '1' when 
+        -- Ball 1
+        (lives >= 1 and (pix_x >= L_X_START and pix_x < L_X_START + L_SIZE) 
+                    and (pix_y >= L_Y_START and pix_y < L_Y_START + L_SIZE)) or
+        
+        -- Ball 2
+        (lives >= 2 and (pix_x >= L_X_START + L_GAP and pix_x < L_X_START + L_GAP + L_SIZE) 
+                    and (pix_y >= L_Y_START and pix_y < L_Y_START + L_SIZE)) or
+
+        -- Ball 3
+        (lives >= 3 and (pix_x >= L_X_START + L_GAP*2 and pix_x < L_X_START + L_GAP*2 + L_SIZE) 
+                    and (pix_y >= L_Y_START and pix_y < L_Y_START + L_SIZE))
+    else '0';
 
 
     -------------------------------------------------------------------------
     -- 3. TEXT ENGINE (Scores & Welcome)
     -------------------------------------------------------------------------
-    process(pix_x, pix_y, score_l, score_r, game_state, char_selection)
-        variable scaled_y : integer;
-        variable char_col_idx : integer;
+    process(pix_x, pix_y, score_l, score_r, game_state)
+        variable scaled_y    : integer range 0 to 7;
+        variable char_col    : integer;
+        variable char_idx    : integer range 0 to 15;
+        variable text_active : boolean;
+        variable welcome_pos : integer;
+        variable rel_x       : unsigned(11 downto 0);
     begin
-        draw_text <= '0';
-        char_selection <= 0; 
-        scaled_y := 0;
-        char_col_idx := -1;
+        -- Defaults
+        draw_text   <= '0';
+        scaled_y    := 0;
+        char_col    := 0;
+        char_idx    := 0;
+        text_active := false;
         
         -- A. DRAW LEFT SCORE
         if (pix_y >= 50 and pix_y < 114) and (pix_x >= 300 and pix_x < 364) then
-            char_selection <= score_l;
-            scaled_y := (pix_y - 50) / 8; -- Scale 8x
-            char_col_idx := (pix_x - 300) / 8; 
+            char_idx    := score_l;
+            scaled_y    := (pix_y - 50) / 8;
+            char_col    := (pix_x - 300) / 8;
+            text_active := true;
             
         -- B. DRAW RIGHT SCORE
         elsif (pix_y >= 50 and pix_y < 114) and (pix_x >= 1500 and pix_x < 1564) then
-            char_selection <= score_r;
-            scaled_y := (pix_y - 50) / 8;
-            char_col_idx := (pix_x - 1500) / 8;
+            char_idx    := score_r;
+            scaled_y    := (pix_y - 50) / 8;
+            char_col    := (pix_x - 1500) / 8;
+            text_active := true;
             
-        -- C. DRAW "WELCOME" (Only in IDLE state: game_state = 0)
-        elsif (game_state = IDLE) and (pix_y >= 400 and pix_y < 432) then
-            scaled_y := (pix_y - 400) / 4; -- Scale 4x
-            
-            if (pix_x >= 800 and pix_x < 832) then char_selection <= 10; -- W
-                char_col_idx := (pix_x - 800) / 4;
-            elsif (pix_x >= 840 and pix_x < 872) then char_selection <= 11; -- E
-                char_col_idx := (pix_x - 840) / 4;
-            elsif (pix_x >= 880 and pix_x < 912) then char_selection <= 12; -- L
-                char_col_idx := (pix_x - 880) / 4;
-            elsif (pix_x >= 920 and pix_x < 952) then char_selection <= 13; -- C
-                char_col_idx := (pix_x - 920) / 4;
-            elsif (pix_x >= 960 and pix_x < 992) then char_selection <= 14; -- O
-                char_col_idx := (pix_x - 960) / 4;
-            elsif (pix_x >= 1000 and pix_x < 1032) then char_selection <= 15; -- M
-                char_col_idx := (pix_x - 1000) / 4;
-            elsif (pix_x >= 1040 and pix_x < 1072) then char_selection <= 11; -- E
-                char_col_idx := (pix_x - 1040) / 4;
+-- C. DRAW "WELCOME" (Only in WELCOME)
+        elsif (game_state = WELCOME) and (pix_y >= 400 and pix_y < 432) then
+            if (pix_x >= WELCOME_X and pix_x < WELCOME_X + WORD_WIDTH) then
+                
+                -- 1. Calculate Relative X (Distance from start of word)
+                rel_x := to_unsigned(pix_x - WELCOME_X, 12);
+                
+                -- 2. Bit Slice for Index: Dividing by 32 means looking at bits 5 and up
+                welcome_pos := to_integer(rel_x(11 downto 5)); 
+                
+                case welcome_pos is
+                    when 0 => char_idx := 4; -- W
+                    when 1 => char_idx := 5; -- E
+                    when 2 => char_idx := 6; -- L
+                    when 3 => char_idx := 7; -- C
+                    when 4 => char_idx := 8; -- O
+                    when 5 => char_idx := 9; -- M
+                    when 6 => char_idx := 5; -- E
+                    when others => text_active := false;
+                end case;
+
+                if welcome_pos <= 6 then
+                    scaled_y := (pix_y - 400) / 4;
+                    
+                    -- 3. Bit Slice for Column: Bits 4..2 represent (val % 32) / 4
+                    char_col := to_integer(rel_x(4 downto 2));
+                    
+                    text_active := (char_col < 8); 
+                end if;
+            end if;
+
+        -- D. DRAW "GAME OVER" (Only in GAMEOVER state)
+        elsif (game_state = GAMEOVER) and (pix_y >= 400 and pix_y < 432) then
+            if (pix_x >= GO_X and pix_x < GO_X + GO_WIDTH) then
+                
+                -- 1. Calculate Relative X
+                rel_x := to_unsigned(pix_x - GO_X, 12);
+                
+                -- 2. Bit Slice for Index
+                welcome_pos := to_integer(rel_x(11 downto 5)); 
+
+                case welcome_pos is
+                    when 0 => char_idx := 10; -- G
+                    when 1 => char_idx := 11; -- A
+                    when 2 => char_idx := 9;  -- M
+                    when 3 => char_idx := 5;  -- E
+                    when 4 => char_idx := 14; -- SPACE
+                    when 5 => char_idx := 8;  -- O
+                    when 6 => char_idx := 12; -- V
+                    when 7 => char_idx := 5;  -- E
+                    when 8 => char_idx := 13; -- R
+                    when others => text_active := false;
+                end case;
+
+                if welcome_pos <= 8 then
+                    scaled_y := (pix_y - 400) / 4;
+                    
+                    -- 3. Bit Slice for Column
+                    char_col := to_integer(rel_x(4 downto 2));
+                    
+                    text_active := (char_col < 8); 
+                end if;
             end if;
         end if;
         
-        -- D. BITMAP DEFINITIONS
-        case char_selection is
-            when 0 => case scaled_y is when 0|6 => char_line_bits <= "00111100"; when 1 to 5 => char_line_bits <= "01100110"; when others => char_line_bits <= "00000000"; end case;
-            when 1 => case scaled_y is when 0|2 to 5 => char_line_bits <= "00011000"; when 1 => char_line_bits <= "00111000"; when 6 => char_line_bits <= "00111110"; when others => char_line_bits <= "00000000"; end case;
-            when 2 => case scaled_y is when 0 => char_line_bits <= "00111100"; when 1 => char_line_bits <= "01100110"; when 2 => char_line_bits <= "00000110"; when 3 => char_line_bits <= "00001100"; when 4 => char_line_bits <= "00110000"; when 5 => char_line_bits <= "01100000"; when 6 => char_line_bits <= "01111110"; when others => char_line_bits <= "00000000"; end case;
-            when 3 => case scaled_y is when 0|6 => char_line_bits <= "00111100"; when 1|5 => char_line_bits <= "01100110"; when 2|4 => char_line_bits <= "00000110"; when 3 => char_line_bits <= "00011100"; when others => char_line_bits <= "00000000"; end case;
-            when 4 => case scaled_y is when 0 => char_line_bits <= "00001100"; when 1 => char_line_bits <= "00011100"; when 2 => char_line_bits <= "00101100"; when 3 => char_line_bits <= "01001100"; when 4 => char_line_bits <= "01111110"; when 5|6 => char_line_bits <= "00001100"; when others => char_line_bits <= "00000000"; end case;
-            when 5 => case scaled_y is when 0 => char_line_bits <= "01111110"; when 1 => char_line_bits <= "01100000"; when 2 => char_line_bits <= "01111100"; when 3|4 => char_line_bits <= "00000110"; when 5 => char_line_bits <= "01100110"; when 6 => char_line_bits <= "00111100"; when others => char_line_bits <= "00000000"; end case;
-            when 6 => case scaled_y is when 0 => char_line_bits <= "00111100"; when 1 => char_line_bits <= "01100110"; when 2 => char_line_bits <= "01100000"; when 3 => char_line_bits <= "01111100"; when 4|5 => char_line_bits <= "01100110"; when 6 => char_line_bits <= "00111100"; when others => char_line_bits <= "00000000"; end case;
-            when 7 => case scaled_y is when 0 => char_line_bits <= "01111110"; when 1 => char_line_bits <= "00000110"; when 2 => char_line_bits <= "00001100"; when 3 => char_line_bits <= "00011000"; when 4 to 6 => char_line_bits <= "00110000"; when others => char_line_bits <= "00000000"; end case;
-            when 8 => case scaled_y is when 0|3|6 => char_line_bits <= "00111100"; when 1|2|4|5 => char_line_bits <= "01100110"; when others => char_line_bits <= "00000000"; end case;
-            when 9 => case scaled_y is when 0|6 => char_line_bits <= "00111100"; when 1|2 => char_line_bits <= "01100110"; when 3 => char_line_bits <= "00111110"; when 4|5 => char_line_bits <= "00000110"; when others => char_line_bits <= "00000000"; end case;
-            when 10 => -- W
-                 case scaled_y is when 0 to 2 => char_line_bits <= "11000011"; when 3 => char_line_bits <= "11011011"; when 4 => char_line_bits <= "11111111"; when 5 => char_line_bits <= "10100101"; when 6 => char_line_bits <= "10000001"; when others => char_line_bits <= "00000000"; end case;
-            when 11 => -- E
-                 case scaled_y is when 0|6 => char_line_bits <= "11111110"; when 1|2|4|5 => char_line_bits <= "11000000"; when 3 => char_line_bits <= "11111000"; when others => char_line_bits <= "00000000"; end case;
-            when 12 => -- L
-                 case scaled_y is when 0 to 5 => char_line_bits <= "11000000"; when 6 => char_line_bits <= "11111110"; when others => char_line_bits <= "00000000"; end case;
-            when 13 => -- C
-                 case scaled_y is when 0|6 => char_line_bits <= "00111100"; when 1|5 => char_line_bits <= "01100000"; when 2 to 4 => char_line_bits <= "11000000"; when others => char_line_bits <= "00000000"; end case;
-            when 14 => -- O
-                 case scaled_y is when 0|6 => char_line_bits <= "00111100"; when 1 to 5 => char_line_bits <= "01100110"; when others => char_line_bits <= "00000000"; end case;
-            when 15 => -- M
-                 case scaled_y is when 0|5|6 => char_line_bits <= "10000001"; when 1 => char_line_bits <= "11000011"; when 2 => char_line_bits <= "11100111"; when 3 => char_line_bits <= "10111101"; when 4 => char_line_bits <= "10011001"; when others => char_line_bits <= "00000000"; end case;
-            when others => char_line_bits <= "00000000";
-        end case;
-
-        -- E. CHECK BIT
-        if (char_col_idx >= 0 and char_col_idx <= 7) then
-            if char_line_bits(7 - char_col_idx) = '1' then 
-                draw_text <= '1'; 
+        
+        -- D. RENDER PIXEL FROM ROM
+        if text_active and (char_col >= 0 and char_col <= 7) then
+            -- Check the bit in the constant array
+            if FONT_ROM(char_idx)(scaled_y)(7 - char_col) = '1' then
+                draw_text <= '1';
             end if;
         end if;
+        
     end process;
-
 
     -------------------------------------------------------------------------
     -- 4. COLOR MUX (PRIORITY ENCODER)
@@ -180,15 +367,15 @@ begin
 
             -- Priority 5: Life Bar (Green)
             elsif draw_lives = '1' then
-                vga_r <= "0000"; vga_g <= C_GREEN; vga_b <= "0000"; 
+                vga_r <= "1111"; vga_g <= "0100"; vga_b <= "0100"; 
                 
             -- Priority 6: Background (Depends on State)
             else
                 case game_state is
-                    when IDLE => -- IDLE (Blue)
-                        vga_r <= "0000"; vga_g <= "0000"; vga_b <= C_BLUE;
+                    when WELCOME => -- WELCOME (Blue)
+                        vga_r <= "0000"; vga_g <= "0000"; vga_b <= "0011";
                     when GAMEOVER => -- GAMEOVER (Red)
-                        vga_r <= C_RED; vga_g <= "0000"; vga_b <= "0000";
+                        vga_r <= "0011"; vga_g <= "0000"; vga_b <= "0000";
                     when others => -- PLAY/SERVE (Black)
                         vga_r <= C_BLACK; vga_g <= C_BLACK; vga_b <= C_BLACK;
                 end case;
