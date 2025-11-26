@@ -101,24 +101,24 @@ begin
                     when PLAY =>
                         -- 1. PADDLE MOVEMENT
                         -- Left
-                        if LEFT_P_UP = '1' and pl_y > 20 then pl_y <= pl_y - 4; end if;
-                        if LEFT_P_DOWN = '1' and pl_y < 900 then pl_y <= pl_y + 4; end if;
+                        if LEFT_P_UP = '1' and pl_y > 20 then pl_y <= pl_y - 1; end if;
+                        if LEFT_P_DOWN = '1' and pl_y < 900 then pl_y <= pl_y + 1; end if;
                         -- Right
-                        if RIGHT_P_UP = '1' and pr_y > 20 then pr_y <= pr_y - 4; end if;
-                        if RIGHT_P_DOWN = '1' and pr_y < 900 then pr_y <= pr_y + 4; end if;
+                        if RIGHT_P_UP = '1' and pr_y > 20 then pr_y <= pr_y - 1; end if;
+                        if RIGHT_P_DOWN = '1' and pr_y < 900 then pr_y <= pr_y + 1; end if;
                         
                         -- 2. BALL Y MOVEMENT (Bouncing off top/bottom)
                         if b_dy = '1' then -- Down
                             if b_y >= (FRAME_HEIGHT - BALL_SIZE - 10) then 
                                 b_dy <= '0'; 
                             else 
-                                b_y <= b_y + 3; 
+                                b_y <= b_y + 1; 
                             end if;
                         else -- Up
                             if b_y <= 10 then 
                                 b_dy <= '1'; 
                             else 
-                                b_y <= b_y - 3; 
+                                b_y <= b_y - 1; 
                             end if;
                         end if;
                         
@@ -138,7 +138,7 @@ begin
                                     lives_reg <= lives_reg - 1; state <= SERVE; 
                                 end if;
                             else
-                                b_x <= b_x + 3; -- Continue
+                                b_x <= b_x + 1; -- Continue
                             end if;
                         else -- Moving Left
                             -- Hit Left Paddle?
@@ -154,10 +154,12 @@ begin
                                     lives_reg <= lives_reg - 1; state <= SERVE; 
                                 end if;
                             else
-                                b_x <= b_x - 3; -- Continue
+                                b_x <= b_x - 1; -- Continue
                             end if;
                         end if;
-                end case;
+                    when GAMEOVER =>
+
+               end case;
             end if;
         end if;
     end process;
