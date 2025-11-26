@@ -6,7 +6,7 @@ package constants_pkg is
     -------------------------------------------------------------------------
     -- 1. STATE MACHINE
     -------------------------------------------------------------------------
-    type state_type is (IDLE, PLAY, SERVE, GAMEOVER);
+    type state_type is (WELCOME, SERVE, PLAY, GAMEOVER);
 
     -------------------------------------------------------------------------
     -- 2. GAME CONSTANTS (Single Source of Truth)

@@ -60,7 +60,7 @@ architecture Behavioral of top is
 
     -- State Machine Definition
     -- (Type is inherited from constants_pkg)
-    signal state : state_type := IDLE;
+    signal state : state_type := WELCOME;
     
     -- Object Coordinates (12-bit vectors to hold positions up to 2200)
     signal ball_x : std_logic_vector(11 downto 0) := x"3C0"; -- Center X

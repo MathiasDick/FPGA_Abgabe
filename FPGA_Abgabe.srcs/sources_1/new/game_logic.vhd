@@ -39,7 +39,7 @@ architecture Behavioral of game_logic is
     signal b_dy : std_logic := '1'; -- 1=Down, 0=Up
     
     -- State Machine
-    signal state : state_type := IDLE;
+    signal state : state_type := WELCOME;
     
     -- Scoring
     signal lives_reg : integer range 0 to 3 := 3;
@@ -76,7 +76,7 @@ begin
             
             -- HARD RESET
             if rst = '1' then
-                state <= IDLE;
+                state <= WELCOME;
                 lives_reg <= 3;
                 sc_l <= 0; sc_r <= 0;
                 b_x <= 960; b_y <= 540;
@@ -87,7 +87,7 @@ begin
                 
                 case state is
                     ---------------------------------------------------------
-                    when IDLE =>
+                    when WELCOME =>
                         if (LEFT_P_UP /= '0' or LEFT_P_DOWN /= '0' or RIGHT_P_UP /= '0' or RIGHT_P_DOWN /= '0') then state <= SERVE; end if;
                     ---------------------------------------------------------
                     when SERVE =>
