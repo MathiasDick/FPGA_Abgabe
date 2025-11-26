@@ -27,7 +27,7 @@ package constants_pkg is
     -- SPEED CONTROL (Frequency Dividers)
     -- 2,500,000 = ~60 updates per second (Standard)
     -- 1,250,000 = ~120 updates per second (Fast)
-    constant BALL_CLK_DIV   : natural := 350000; -- Ball moves slightly faster
+    constant BALL_CLK_DIV   : natural := 480000; -- Ball moves slightly faster
     constant PADDLE_CLK_DIV : natural := 600000; -- Paddles move standard speed
     -------------------------------------------------------------------------
     -- 3. COLOR PALETTE (4-bit per channel)
