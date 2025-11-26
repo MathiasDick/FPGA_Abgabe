@@ -10,10 +10,10 @@ entity draw is
            pixel_y  : in  STD_LOGIC_VECTOR(11 downto 0);
            
            -- Object Inputs from Game Logic
-           ball_x   : in  STD_LOGIC_VECTOR(11 downto 0);
-           ball_y   : in  STD_LOGIC_VECTOR(11 downto 0);
-           pad_l_y  : in  STD_LOGIC_VECTOR(11 downto 0);
-           pad_r_y  : in  STD_LOGIC_VECTOR(11 downto 0);
+           ball_x     : in integer range 0 to 4095;
+           ball_y     : in integer range 0 to 4095;
+           pad_l_y    : in integer range 0 to 4095;
+           pad_r_y    : in integer range 0 to 4095;
            score_l  : in  integer;
            score_r  : in  integer;
            lives    : in  integer;
@@ -185,8 +185,7 @@ architecture Behavioral of draw is
 
     -- INTERNAL SIGNALS
     signal pix_x, pix_y : integer;
-    signal b_x, b_y     : integer;
-    signal pl_y, pr_y   : integer;
+
 
     -- DRAW FLAGS
     signal draw_ball, draw_pad_l, draw_pad_r, draw_lives : std_logic;
@@ -197,25 +196,22 @@ begin
     -- 1. CONVERT INPUTS TO INTEGERS
     pix_x <= to_integer(unsigned(pixel_x));
     pix_y <= to_integer(unsigned(pixel_y));
-    b_x   <= to_integer(unsigned(ball_x));
-    b_y   <= to_integer(unsigned(ball_y));
-    pl_y  <= to_integer(unsigned(pad_l_y));
-    pr_y  <= to_integer(unsigned(pad_r_y));
+
 
     -------------------------------------------------------------------------
     -- 2. OBJECT GENERATION (Hit Box Logic)
     -------------------------------------------------------------------------
     -- Ball
-    draw_ball <= '1' when (pix_x >= b_x and pix_x < b_x + BALL_SIZE) and
-                          (pix_y >= b_y and pix_y < b_y + BALL_SIZE) else '0';
+    draw_ball <= '1' when (pix_x >= ball_x and pix_x < ball_x + BALL_SIZE) and
+                          (pix_y >= ball_y and pix_y < ball_y + BALL_SIZE) else '0';
                           
     -- Left Paddle
     draw_pad_l <= '1' when (pix_x >= PADDLE_OFFSET and pix_x < PADDLE_OFFSET + PADDLE_W) and
-                           (pix_y >= pl_y and pix_y < pl_y + PADDLE_H) else '0';
+                           (pix_y >= pad_l_y and pix_y < pad_l_y + PADDLE_H) else '0';
 
     -- Right Paddle
     draw_pad_r <= '1' when (pix_x >= (FRAME_WIDTH - PADDLE_OFFSET - PADDLE_W) and pix_x < (FRAME_WIDTH - PADDLE_OFFSET)) and
-                           (pix_y >= pr_y and pix_y < pr_y + PADDLE_H) else '0';
+                           (pix_y >= pad_r_y and pix_y < pad_r_y + PADDLE_H) else '0';
 
     -- Live Balls
     draw_lives <= '1' when 

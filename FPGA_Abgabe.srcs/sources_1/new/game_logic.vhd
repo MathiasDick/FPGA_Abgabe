@@ -12,10 +12,10 @@ entity game_logic is
            RIGHT_P_DOWN : in STD_LOGIC;
            
            -- Outputs to the Renderer
-           ball_x    : out STD_LOGIC_VECTOR(11 downto 0);
-           ball_y    : out STD_LOGIC_VECTOR(11 downto 0);
-           pad_l_y   : out STD_LOGIC_VECTOR(11 downto 0);
-           pad_r_y   : out STD_LOGIC_VECTOR(11 downto 0);
+           ball_x    : out integer range 0 to 4095;
+           ball_y    : out integer range 0 to 4095;
+           pad_l_y   : out integer range 0 to 4095;
+           pad_r_y   : out integer range 0 to 4095;
            
            score_l   : out integer range 0 to 9;
            score_r   : out integer range 0 to 9;
@@ -46,8 +46,11 @@ architecture Behavioral of game_logic is
     signal sc_l, sc_r : integer range 0 to 9 := 0;
 
     -- Physics Timing
-    signal game_tick : std_logic;
-    signal tick_cntr : integer range 0 to GAME_CLK_DIV := 0;
+    signal ball_tick    : std_logic;
+    signal ball_cntr    : integer range 0 to BALL_CLK_DIV := 0;
+    
+    signal paddle_tick  : std_logic;
+    signal paddle_cntr  : integer range 0 to PADDLE_CLK_DIV := 0;
 
 begin
 
@@ -57,12 +60,22 @@ begin
     process (clk_pxl)
     begin
         if rising_edge(clk_pxl) then
-            if tick_cntr = (GAME_CLK_DIV - 1) then
-                tick_cntr <= 0;
-                game_tick <= '1'; -- Trigger one physics frame
+            -- 1. Ball Timer
+            if ball_cntr = (BALL_CLK_DIV - 1) then
+                ball_cntr <= 0;
+                ball_tick <= '1';
             else
-                tick_cntr <= tick_cntr + 1;
-                game_tick <= '0';
+                ball_cntr <= ball_cntr + 1;
+                ball_tick <= '0';
+            end if;
+
+            -- 2. Paddle Timer
+            if paddle_cntr = (PADDLE_CLK_DIV - 1) then
+                paddle_cntr <= 0;
+                paddle_tick <= '1';
+            else
+                paddle_cntr <= paddle_cntr + 1;
+                paddle_tick <= '0';
             end if;
         end if;
     end process;
@@ -83,7 +96,7 @@ begin
                 pl_y <= 450; pr_y <= 450;
             
             -- PHYSICS UPDATE TICK
-            elsif game_tick = '1' then
+            else
                 
                 case state is
                     ---------------------------------------------------------
@@ -97,68 +110,78 @@ begin
                         -- Launch on Up Button
                         if LEFT_P_UP = '1' or LEFT_P_DOWN = '1' or RIGHT_P_UP = '1' or RIGHT_P_DOWN = '1' then state <= PLAY; 
                         end if;
-                    ---------------------------------------------------------
                     when PLAY =>
-                        -- 1. PADDLE MOVEMENT
-                        -- Left
-                        if LEFT_P_UP = '1' and pl_y > 20 then pl_y <= pl_y - 1; end if;
-                        if LEFT_P_DOWN = '1' and pl_y < 900 then pl_y <= pl_y + 1; end if;
-                        -- Right
-                        if RIGHT_P_UP = '1' and pr_y > 20 then pr_y <= pr_y - 1; end if;
-                        if RIGHT_P_DOWN = '1' and pr_y < 900 then pr_y <= pr_y + 1; end if;
                         
-                        -- 2. BALL Y MOVEMENT (Bouncing off top/bottom)
-                        if b_dy = '1' then -- Down
-                            if b_y >= (FRAME_HEIGHT - BALL_SIZE - 10) then 
-                                b_dy <= '0'; 
-                            else 
-                                b_y <= b_y + 1; 
-                            end if;
-                        else -- Up
-                            if b_y <= 10 then 
-                                b_dy <= '1'; 
-                            else 
-                                b_y <= b_y - 1; 
-                            end if;
+                        -- === PADDLE MOVEMENT (Runs on Paddle Tick) ===
+                        if paddle_tick = '1' then
+                            -- Left
+                            if LEFT_P_UP = '1' and pl_y > 20 then pl_y <= pl_y - 1; end if;
+                            if LEFT_P_DOWN = '1' and pl_y < 900 then pl_y <= pl_y + 1; end if;
+                            -- Right
+                            if RIGHT_P_UP = '1' and pr_y > 20 then pr_y <= pr_y - 1; end if;
+                            if RIGHT_P_DOWN = '1' and pr_y < 900 then pr_y <= pr_y + 1; end if;
                         end if;
-                        
-                        -- 3. BALL X MOVEMENT (Collisions & Scoring)
-                        if b_dx = '1' then -- Moving Right
-                            -- Hit Right Paddle?
-                            if (b_x + BALL_SIZE >= FRAME_WIDTH - PADDLE_OFFSET - PADDLE_W) and
-                               (b_x + BALL_SIZE <= FRAME_WIDTH - PADDLE_OFFSET) and
-                               (b_y + BALL_SIZE >= pr_y) and (b_y <= pr_y + PADDLE_H) then
-                                b_dx <= '0'; -- Bounce
-                            -- Missed?
-                            elsif b_x >= (FRAME_WIDTH - BALL_SIZE - 5) then
-                                if sc_l < 9 then sc_l <= sc_l + 1; end if;
-                                if lives_reg = 1 then 
-                                    lives_reg <= 0; state <= GAMEOVER; 
-                                else 
-                                    lives_reg <= lives_reg - 1; state <= SERVE; 
-                                end if;
-                            else
-                                b_x <= b_x + 1; -- Continue
-                            end if;
-                        else -- Moving Left
-                            -- Hit Left Paddle?
-                            if (b_x <= PADDLE_OFFSET + PADDLE_W) and (b_x >= PADDLE_OFFSET) and
-                               (b_y + BALL_SIZE >= pl_y) and (b_y <= pl_y + PADDLE_H) then
-                                b_dx <= '1'; -- Bounce
-                            -- Missed?
-                            elsif b_x <= 5 then
-                                if sc_r < 9 then sc_r <= sc_r + 1; end if;
-                                if lives_reg = 1 then 
-                                    lives_reg <= 0; state <= GAMEOVER; 
-                                else 
-                                    lives_reg <= lives_reg - 1; state <= SERVE; 
-                                end if;
-                            else
-                                b_x <= b_x - 1; -- Continue
-                            end if;
-                        end if;
-                    when GAMEOVER =>
 
+                        -- === BALL MOVEMENT & COLLISION (Runs on Ball Tick) ===
+                        if ball_tick = '1' then
+                            
+                            -- A. BALL Y MOVEMENT (Bouncing off top/bottom)
+                            if b_dy = '1' then -- Down
+                                if b_y >= (FRAME_HEIGHT - BALL_SIZE - 10) then 
+                                    b_dy <= '0'; 
+                                else 
+                                    b_y <= b_y + 1; 
+                                end if;
+                            else -- Up
+                                if b_y <= 10 then 
+                                    b_dy <= '1'; 
+                                else 
+                                    b_y <= b_y - 1; 
+                                end if;
+                            end if;
+                            
+                            -- B. BALL X MOVEMENT (Collisions & Scoring)
+                            if b_dx = '1' then -- Moving Right
+                                -- Hit Right Paddle?
+                                if (b_x + BALL_SIZE >= FRAME_WIDTH - PADDLE_OFFSET - PADDLE_W) and
+                                   (b_x + BALL_SIZE <= FRAME_WIDTH - PADDLE_OFFSET) and
+                                   (b_y + BALL_SIZE >= pr_y) and (b_y <= pr_y + PADDLE_H) then
+                                    b_dx <= '0'; -- Bounce
+                                -- Missed?
+                                elsif b_x >= (FRAME_WIDTH - BALL_SIZE - 5) then
+                                    if sc_l < 9 then sc_l <= sc_l + 1; end if;
+                                    
+                                    if lives_reg = 1 then 
+                                        lives_reg <= 0; state <= GAMEOVER; 
+                                    else 
+                                        lives_reg <= lives_reg - 1; state <= SERVE; 
+                                    end if;
+                                else
+                                    b_x <= b_x + 1; -- Continue
+                                end if;
+                            else -- Moving Left
+                                -- Hit Left Paddle?
+                                if (b_x <= PADDLE_OFFSET + PADDLE_W) and (b_x >= PADDLE_OFFSET) and
+                                   (b_y + BALL_SIZE >= pl_y) and (b_y <= pl_y + PADDLE_H) then
+                                    b_dx <= '1'; -- Bounce
+                                -- Missed?
+                                elsif b_x <= 5 then
+                                    if sc_r < 9 then sc_r <= sc_r + 1; end if;
+                                    
+                                    if lives_reg = 1 then 
+                                        lives_reg <= 0; state <= GAMEOVER; 
+                                    else 
+                                        lives_reg <= lives_reg - 1; state <= SERVE; 
+                                    end if;
+                                else
+                                    b_x <= b_x - 1; -- Continue
+                                end if;
+                            end if;
+                        end if; -- End Ball Tick
+
+                    ---------------------------------------------------------
+                    when GAMEOVER =>
+                        -- Wait for Reset (handled in Hard Reset block)
                end case;
             end if;
         end if;
@@ -168,10 +191,10 @@ begin
     -- OUTPUT CONVERSIONS
     -------------------------------------------------------------------------
     -- Convert our internal Integers to STD_LOGIC_VECTORS for the ports
-    ball_x <= std_logic_vector(to_unsigned(b_x, 12));
-    ball_y <= std_logic_vector(to_unsigned(b_y, 12));
-    pad_l_y <= std_logic_vector(to_unsigned(pl_y, 12));
-    pad_r_y <= std_logic_vector(to_unsigned(pr_y, 12));
+    ball_x  <= b_x;
+    ball_y  <= b_y;
+    pad_l_y <= pl_y;
+    pad_r_y <= pr_y;
     
     -- Pass signals directly
     score_l <= sc_l;

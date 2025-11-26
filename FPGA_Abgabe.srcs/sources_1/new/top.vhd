@@ -20,6 +20,8 @@ entity top is
     Port ( 
            CLK_I : in  STD_LOGIC; -- System Clock (100 MHz)
            
+           -- Buttons: [3] Right Up, [2] Right Down, [1] Left Up, [0] Left Down
+           -- btn   : in  STD_LOGIC_VECTOR (3 downto 0);
            LEFT_P_UP : in STD_LOGIC;
            LEFT_P_DOWN : in STD_LOGIC;
            RIGHT_P_UP : in STD_LOGIC;
@@ -63,11 +65,11 @@ architecture Behavioral of top is
     signal state : state_type := WELCOME;
     
     -- Object Coordinates (12-bit vectors to hold positions up to 2200)
-    signal ball_x : std_logic_vector(11 downto 0) := x"3C0"; -- Center X
-    signal ball_y : std_logic_vector(11 downto 0) := x"21C"; -- Center Y
+    signal ball_x  : integer range 0 to 4095 := 960; -- Center X
+    signal ball_y  : integer range 0 to 4095 := 540; -- Center Y 
     
-    signal pad_l_y : std_logic_vector(11 downto 0) := x"1C2"; -- Left Paddle Y
-    signal pad_r_y : std_logic_vector(11 downto 0) := x"1C2"; -- Right Paddle Y
+    signal pad_l_y : integer range 0 to 4095 := 450; -- Left Paddle Start
+    signal pad_r_y : integer range 0 to 4095 := 450; -- Right Paddle Start
     
     -- Scoring & Lives
     signal lives : integer range 0 to 3 := 3; -- Total Balls per session

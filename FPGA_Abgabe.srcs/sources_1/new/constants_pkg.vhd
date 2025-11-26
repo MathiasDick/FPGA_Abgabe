@@ -23,8 +23,12 @@ package constants_pkg is
     
     -- Game Settings
     constant MAX_LIVES     : natural := 3;
-    constant GAME_CLK_DIV  : natural := 2500000; -- Speed control
-
+    
+    -- SPEED CONTROL (Frequency Dividers)
+    -- 2,500,000 = ~60 updates per second (Standard)
+    -- 1,250,000 = ~120 updates per second (Fast)
+    constant BALL_CLK_DIV   : natural := 350000; -- Ball moves slightly faster
+    constant PADDLE_CLK_DIV : natural := 600000; -- Paddles move standard speed
     -------------------------------------------------------------------------
     -- 3. COLOR PALETTE (4-bit per channel)
     -------------------------------------------------------------------------
@@ -52,10 +56,10 @@ package constants_pkg is
            video_on   : in  STD_LOGIC;
            pixel_x    : in  STD_LOGIC_VECTOR(11 downto 0);
            pixel_y    : in  STD_LOGIC_VECTOR(11 downto 0);
-           ball_x     : in  STD_LOGIC_VECTOR(11 downto 0);
-           ball_y     : in  STD_LOGIC_VECTOR(11 downto 0);
-           pad_l_y    : in  STD_LOGIC_VECTOR(11 downto 0);
-           pad_r_y    : in  STD_LOGIC_VECTOR(11 downto 0);
+           ball_x     : in  integer range 0 to 4095;
+           ball_y     : in  integer range 0 to 4095;
+           pad_l_y    : in  integer range 0 to 4095;
+           pad_r_y    : in  integer range 0 to 4095;
            score_l    : in  integer;
            score_r    : in  integer;
            lives      : in  integer;
@@ -72,10 +76,10 @@ package constants_pkg is
            LEFT_P_DOWN : in STD_LOGIC;
            RIGHT_P_UP : in STD_LOGIC;
            RIGHT_P_DOWN : in STD_LOGIC;
-           ball_x    : out STD_LOGIC_VECTOR(11 downto 0);
-           ball_y    : out STD_LOGIC_VECTOR(11 downto 0);
-           pad_l_y   : out STD_LOGIC_VECTOR(11 downto 0);
-           pad_r_y   : out STD_LOGIC_VECTOR(11 downto 0);
+           ball_x    : out integer range 0 to 4095;
+           ball_y    : out integer range 0 to 4095;
+           pad_l_y   : out integer range 0 to 4095;
+           pad_r_y   : out integer range 0 to 4095;
            score_l   : out integer range 0 to 9;
            score_r   : out integer range 0 to 9;
            lives     : out integer range 0 to 3;
