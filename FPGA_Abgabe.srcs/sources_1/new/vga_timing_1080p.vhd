@@ -14,6 +14,8 @@ end vga_timing_1080p;
 
 architecture Behavioral of vga_timing_1080p is
 
+    constant COORD_BITS : natural := 12;
+
     constant H_FP  : natural := 88;   -- Front Porch
     constant H_PW  : natural := 44;   -- Pulse Width
     constant H_MAX : natural := 2200; -- Total clocks per line
@@ -85,8 +87,8 @@ begin
             video_on <= active;
             
             -- Convert integers to STD_LOGIC_VECTOR for the output ports
-            pixel_x  <= std_logic_vector(to_unsigned(h_cntr, 12));
-            pixel_y  <= std_logic_vector(to_unsigned(v_cntr, 12));
+            pixel_x  <= std_logic_vector(to_unsigned(h_cntr, COORD_BITS));
+            pixel_y  <= std_logic_vector(to_unsigned(v_cntr, COORD_BITS));
         end if;
     end process;
 

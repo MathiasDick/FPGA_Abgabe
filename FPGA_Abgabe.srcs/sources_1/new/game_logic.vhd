@@ -29,6 +29,21 @@ end game_logic;
 
 architecture Behavioral of game_logic is
 
+    constant MAX_LIVES : natural := 3;
+    
+    -- reset coordinates for paddles and ball
+    constant BALL_Y_CENTER : natural := 540;
+    constant BALL_X_CENTER : natural := 960;
+    constant PADDLE_CENTER : natural := 450;
+    
+    -- paddle logic
+    constant PADDLE_TOP_LIMIT : natural := 20;
+    constant PADDLE_BOTTOM_LIMIT : natural := 900;
+    
+    -- ball logic
+    constant SPACE_TO_FRAME : natural := 10;
+    constant SAFETY_MARGIN : natural := 5;
+    
     -- INTERNAL SIGNALS (Using Integers for easy math)
     -- We track positions as integers internally, then convert to vectors for output
     signal b_x, b_y     : integer range 0 to 4095 := 960; -- Start Center
@@ -90,10 +105,10 @@ begin
             -- HARD RESET
             if rst = '1' then
                 state <= WELCOME;
-                lives_reg <= 3;
+                lives_reg <= MAX_LIVES;
                 sc_l <= 0; sc_r <= 0;
-                b_x <= 960; b_y <= 540;
-                pl_y <= 450; pr_y <= 450;
+                b_x <= BALL_X_CENTER; b_y <= BALL_Y_CENTER;
+                pl_y <= PADDLE_CENTER; pr_y <= PADDLE_CENTER;
             
             -- PHYSICS UPDATE TICK
             else
@@ -105,8 +120,8 @@ begin
                     ---------------------------------------------------------
                     when SERVE =>
                         -- Center Ball
-                        b_x <= 960; 
-                        b_y <= 540;
+                        b_x <= BALL_X_CENTER; 
+                        b_y <= BALL_Y_CENTER;
                         -- Launch on Up Button
                         if LEFT_P_UP = '1' or LEFT_P_DOWN = '1' or RIGHT_P_UP = '1' or RIGHT_P_DOWN = '1' then state <= PLAY; 
                         end if;
@@ -115,11 +130,11 @@ begin
                         -- === PADDLE MOVEMENT (Runs on Paddle Tick) ===
                         if paddle_tick = '1' then
                             -- Left
-                            if LEFT_P_UP = '1' and pl_y > 20 then pl_y <= pl_y - 1; end if;
-                            if LEFT_P_DOWN = '1' and pl_y < 900 then pl_y <= pl_y + 1; end if;
+                            if LEFT_P_UP = '1' and pl_y > PADDLE_TOP_LIMIT then pl_y <= pl_y - 1; end if;
+                            if LEFT_P_DOWN = '1' and pl_y < PADDLE_BOTTOM_LIMIT then pl_y <= pl_y + 1; end if;
                             -- Right
-                            if RIGHT_P_UP = '1' and pr_y > 20 then pr_y <= pr_y - 1; end if;
-                            if RIGHT_P_DOWN = '1' and pr_y < 900 then pr_y <= pr_y + 1; end if;
+                            if RIGHT_P_UP = '1' and pr_y > PADDLE_TOP_LIMIT then pr_y <= pr_y - 1; end if;
+                            if RIGHT_P_DOWN = '1' and pr_y < PADDLE_BOTTOM_LIMIT then pr_y <= pr_y + 1; end if;
                         end if;
 
                         -- === BALL MOVEMENT & COLLISION (Runs on Ball Tick) ===
@@ -127,13 +142,13 @@ begin
                             
                             -- A. BALL Y MOVEMENT (Bouncing off top/bottom)
                             if b_dy = '1' then -- Down
-                                if b_y >= (FRAME_HEIGHT - BALL_SIZE - 10) then 
+                                if b_y >= (FRAME_HEIGHT - BALL_SIZE - SPACE_TO_FRAME) then 
                                     b_dy <= '0'; 
                                 else 
                                     b_y <= b_y + 1; 
                                 end if;
                             else -- Up
-                                if b_y <= 10 then 
+                                if b_y <= SPACE_TO_FRAME then 
                                     b_dy <= '1'; 
                                 else 
                                     b_y <= b_y - 1; 
@@ -148,7 +163,7 @@ begin
                                    (b_y + BALL_SIZE >= pr_y) and (b_y <= pr_y + PADDLE_H) then
                                     b_dx <= '0'; -- Bounce
                                 -- Missed?
-                                elsif b_x >= (FRAME_WIDTH - BALL_SIZE - 5) then
+                                elsif b_x >= (FRAME_WIDTH - BALL_SIZE - SAFETY_MARGIN) then
                                     if sc_l < 9 then sc_l <= sc_l + 1; end if;
                                     
                                     if lives_reg = 1 then 
@@ -165,7 +180,7 @@ begin
                                    (b_y + BALL_SIZE >= pl_y) and (b_y <= pl_y + PADDLE_H) then
                                     b_dx <= '1'; -- Bounce
                                 -- Missed?
-                                elsif b_x <= 5 then
+                                elsif b_x <= SAFETY_MARGIN then
                                     if sc_r < 9 then sc_r <= sc_r + 1; end if;
                                     
                                     if lives_reg = 1 then 

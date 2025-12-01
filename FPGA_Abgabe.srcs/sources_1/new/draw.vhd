@@ -30,15 +30,31 @@ end draw;
 
 architecture Behavioral of draw is
 
+    -- "Score" Values
+    constant SCORE_SCALE : natural := 8; 
+    constant UPPER_Y_BORDER : natural := 50; -- pixel on y axis for upper border
+    constant LOWER_Y_BORDER : natural := 114; -- pixel on y axis for lower border
+    constant LEFT_X_BORDER_L : natural := 300; -- left paddle left border on x axis
+    constant LEFT_X_BORDER_R : natural := 364; -- left paddle right border on x axis
+    constant RIGHT_X_BORDER_L : natural := 1500; -- right paddle left border on x axis
+    constant RIGHT_X_BORDER_R : natural := 1564; -- right paddle right border on x axis
+    
     -- "Welcome" Values
     constant CHAR_WIDTH  : natural := 32;
     constant LETTERS     : natural := 7;
     constant WORD_WIDTH  : natural := CHAR_WIDTH * LETTERS;
+    constant LETTERS_UPPER_Y_BORDER : natural := 400;
+    constant LETTERS_LOWER_Y_BORDER : natural := 432;
+    constant COORD_BITS : natural := 12; -- bit length of pixel coordinates
+    constant WELCOME_MAX_POS : natural := 6;
+    constant FONT_MAX_COL : natural := 7;
+    constant TEXT_SCALE : natural := 4;
     
     -- "Game Over" Values
-    constant GO_LETTERS  : natural := 9; -- "GAME OVER" is 9 chars (including space)
-    constant GO_WIDTH    : natural := CHAR_WIDTH * GO_LETTERS;
-    constant GO_X        : natural := (FRAME_WIDTH - GO_WIDTH) / 2;
+    constant GO_LETTERS : natural := 9; -- "GAME OVER" is 9 chars (including space)
+    constant GO_WIDTH : natural := CHAR_WIDTH * GO_LETTERS;
+    constant GO_X : natural := (FRAME_WIDTH - GO_WIDTH) / 2;
+    constant GO_MAX_POS : natural := 8;
     
     constant WELCOME_X : natural := (FRAME_WIDTH - WORD_WIDTH) / 2;
     
@@ -248,25 +264,25 @@ begin
         text_active := false;
         
         -- A. DRAW LEFT SCORE
-        if (pix_y >= 50 and pix_y < 114) and (pix_x >= 300 and pix_x < 364) then
+        if (pix_y >= UPPER_Y_BORDER and pix_y < LOWER_Y_BORDER) and (pix_x >= LEFT_X_BORDER_L and pix_x < LEFT_X_BORDER_R) then
             char_idx    := score_l;
-            scaled_y    := (pix_y - 50) / 8;
-            char_col    := (pix_x - 300) / 8;
+            scaled_y    := (pix_y - UPPER_Y_BORDER) / SCORE_SCALE;
+            char_col    := (pix_x - LEFT_X_BORDER_L) / SCORE_SCALE;
             text_active := true;
             
         -- B. DRAW RIGHT SCORE
-        elsif (pix_y >= 50 and pix_y < 114) and (pix_x >= 1500 and pix_x < 1564) then
+        elsif (pix_y >= UPPER_Y_BORDER and pix_y < LOWER_Y_BORDER) and (pix_x >= RIGHT_X_BORDER_L and pix_x < RIGHT_X_BORDER_R) then
             char_idx    := score_r;
-            scaled_y    := (pix_y - 50) / 8;
-            char_col    := (pix_x - 1500) / 8;
+            scaled_y    := (pix_y - UPPER_Y_BORDER) / SCORE_SCALE;
+            char_col    := (pix_x - RIGHT_X_BORDER_L) / SCORE_SCALE;
             text_active := true;
             
 -- C. DRAW "WELCOME" (Only in WELCOME)
-        elsif (game_state = WELCOME) and (pix_y >= 400 and pix_y < 432) then
+        elsif (game_state = WELCOME) and (pix_y >= LETTERS_UPPER_Y_BORDER and pix_y < LETTERS_LOWER_Y_BORDER) then
             if (pix_x >= WELCOME_X and pix_x < WELCOME_X + WORD_WIDTH) then
                 
                 -- 1. Calculate Relative X (Distance from start of word)
-                rel_x := to_unsigned(pix_x - WELCOME_X, 12);
+                rel_x := to_unsigned(pix_x - WELCOME_X, COORD_BITS);
                 
                 -- 2. Bit Slice for Index: Dividing by 32 means looking at bits 5 and up
                 welcome_pos := to_integer(rel_x(11 downto 5)); 
@@ -282,22 +298,22 @@ begin
                     when others => text_active := false;
                 end case;
 
-                if welcome_pos <= 6 then
-                    scaled_y := (pix_y - 400) / 4;
+                if welcome_pos <= WELCOME_MAX_POS then
+                    scaled_y := (pix_y - LETTERS_UPPER_Y_BORDER) / TEXT_SCALE;
                     
                     -- 3. Bit Slice for Column: Bits 4..2 represent (val % 32) / 4
                     char_col := to_integer(rel_x(4 downto 2));
                     
-                    text_active := (char_col < 8); 
+                    text_active := (char_col <= FONT_MAX_COL); 
                 end if;
             end if;
 
         -- D. DRAW "GAME OVER" (Only in GAMEOVER state)
-        elsif (game_state = GAMEOVER) and (pix_y >= 400 and pix_y < 432) then
+        elsif (game_state = GAMEOVER) and (pix_y >= LETTERS_UPPER_Y_BORDER and pix_y < LETTERS_LOWER_Y_BORDER) then
             if (pix_x >= GO_X and pix_x < GO_X + GO_WIDTH) then
                 
                 -- 1. Calculate Relative X
-                rel_x := to_unsigned(pix_x - GO_X, 12);
+                rel_x := to_unsigned(pix_x - GO_X, COORD_BITS);
                 
                 -- 2. Bit Slice for Index
                 welcome_pos := to_integer(rel_x(11 downto 5)); 
@@ -315,22 +331,22 @@ begin
                     when others => text_active := false;
                 end case;
 
-                if welcome_pos <= 8 then
-                    scaled_y := (pix_y - 400) / 4;
+                if welcome_pos <= GO_MAX_POS then
+                    scaled_y := (pix_y - LETTERS_UPPER_Y_BORDER) / TEXT_SCALE;
                     
                     -- 3. Bit Slice for Column
                     char_col := to_integer(rel_x(4 downto 2));
                     
-                    text_active := (char_col < 8); 
+                    text_active := (char_col <= FONT_MAX_COL); 
                 end if;
             end if;
         end if;
         
         
         -- D. RENDER PIXEL FROM ROM
-        if text_active and (char_col >= 0 and char_col <= 7) then
+        if text_active and (char_col >= 0 and char_col <= FONT_MAX_COL) then
             -- Check the bit in the constant array
-            if FONT_ROM(char_idx)(scaled_y)(7 - char_col) = '1' then
+            if FONT_ROM(char_idx)(scaled_y)(FONT_MAX_COL - char_col) = '1' then
                 draw_text <= '1';
             end if;
         end if;
