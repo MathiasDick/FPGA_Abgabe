@@ -1,36 +1,33 @@
 ----------------------------------------------------------------------------------
--- PONG GAME FINAL - 3 Balls Total & Green Life Bar
+-- PONG GAME - Top Level Module
 -- 
--- OVERVIEW:
--- This module generates a 1920x1080 VGA signal.
--- It implements a Pong game with a Welcome Screen, Scoreboard, and Physics.
--- Rules: The game ends after 3 balls are played in total.
+-- DESCRIPTION:
+-- Implements a complete Pong game with 1920x1080 VGA output.
+-- Features welcome screen, gameplay, scoring system, and game over screen.
+-- Game ends after player loses all 3 lives.
 --
--- REQUIREMENTS:
--- 1. Clock Wizard IP: Input 100MHz -> Output 148.5MHz (named clk_wiz_0).
--- 2. Constraints: Map 'btn' to buttons and 'sw' to a switch.
+-- HARDWARE REQUIREMENTS:
+-- - Clock Wizard IP: Converts 100MHz input to 148.5MHz pixel clock (clk_wiz_0)
+-- - Constraints file must map button inputs and reset switch
 ----------------------------------------------------------------------------------
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
-use IEEE.std_logic_unsigned.all; -- Allows math on std_logic_vectors
-use IEEE.NUMERIC_STD.ALL;        -- Standard numeric operations
+use IEEE.NUMERIC_STD.ALL;
 use work.constants_pkg.all;
 
 entity top is
     Port ( 
-           CLK_I : in  STD_LOGIC; -- System Clock (100 MHz)
+           CLK_I : in  STD_LOGIC;  -- System clock input (100 MHz)
            
-           -- Buttons: [3] Right Up, [2] Right Down, [1] Left Up, [0] Left Down
-           -- btn   : in  STD_LOGIC_VECTOR (3 downto 0);
+           -- Player control inputs
            LEFT_P_UP : in STD_LOGIC;
            LEFT_P_DOWN : in STD_LOGIC;
            RIGHT_P_UP : in STD_LOGIC;
            RIGHT_P_DOWN : in STD_LOGIC;
            
-           -- Switch: [0] Reset / Force Welcome Screen
-           sw    : in  STD_LOGIC_VECTOR (0 downto 0); 
+           RESET : in  STD_LOGIC;  -- Reset switch: Returns game to WELCOME state
            
-           -- VGA Physical Outputs
+           -- VGA output signals
            VGA_HS_O : out  STD_LOGIC;
            VGA_VS_O : out  STD_LOGIC;
            VGA_R : out  STD_LOGIC_VECTOR (3 downto 0);
@@ -41,8 +38,9 @@ end top;
 
 architecture Behavioral of top is
 
-    -- Component Declaration for the Clock Wizard
-    -- This IP core must be generated in Vivado IP Catalog
+    -------------------------------------------------------------------------
+    -- Clock Wizard IP Component
+    -------------------------------------------------------------------------
     component clk_wiz_0
     port ( 
         CLK_IN1 : in std_logic; 
@@ -50,36 +48,37 @@ architecture Behavioral of top is
     );
     end component;
     
-
-    -- SIGNAL DECLARATIONS
-    signal pxl_clk : std_logic; -- The 148.5 MHz pixel clock
-    signal active : std_logic;  -- '1' when we are drawing visible pixels
+    -------------------------------------------------------------------------
+    -- Internal Signals
+    -------------------------------------------------------------------------
+    signal pxl_clk : std_logic;  -- 148.5 MHz pixel clock for VGA timing
+    signal active : std_logic;   -- Video active region flag
     
-    -- VGA Counters
+    -- VGA timing counters
     signal h_cntr_reg : std_logic_vector(11 downto 0) := (others =>'0');
     signal v_cntr_reg : std_logic_vector(11 downto 0) := (others =>'0');
     
-
-    -- State Machine Definition
-    -- (Type is inherited from constants_pkg)
+    -- Game state
     signal state : state_type := WELCOME;
     
-    -- Object Coordinates (12-bit vectors to hold positions up to 2200)
-    signal ball_x  : integer range 0 to 4095 := 960; -- Center X
-    signal ball_y  : integer range 0 to 4095 := 540; -- Center Y 
+    -- Game object positions
+    signal ball_x  : integer range 0 to 4095 := (FRAME_WIDTH / 2) - (BALL_SIZE / 2);
+    signal ball_y  : integer range 0 to 4095 := (FRAME_HEIGHT / 2) - (BALL_SIZE / 2);
     
-    signal pad_l_y : integer range 0 to 4095 := 450; -- Left Paddle Start
-    signal pad_r_y : integer range 0 to 4095 := 450; -- Right Paddle Start
+    signal pad_l_y : integer range 0 to 4095 := (FRAME_HEIGHT / 2) - (PADDLE_H / 2);
+    signal pad_r_y : integer range 0 to 4095 := (FRAME_HEIGHT / 2) - (PADDLE_H / 2);
     
-    -- Scoring & Lives
-    signal lives : integer range 0 to 3 := 3; -- Total Balls per session
+    -- Score and lives tracking
+    signal lives : integer range 0 to 3 := 3;
     signal score_l : integer range 0 to 3 := 0;
     signal score_r : integer range 0 to 3 := 0;
 
 
 begin
 
-    -- Instantiate the Clock Wizard to get 148.5 MHz from 100 MHz
+    -------------------------------------------------------------------------
+    -- Clock Generation: 100 MHz to 148.5 MHz
+    -------------------------------------------------------------------------
     clk_div_inst : clk_wiz_0 
     port map (
         CLK_IN1 => CLK_I, 
@@ -88,31 +87,30 @@ begin
     
     
     -------------------------------------------------------------------------
-    -- INSTANCE: VGA TIMING MODULE
+    -- VGA Timing Generator (1920x1080 @ 60Hz)
     -------------------------------------------------------------------------
-    -- This replaces the manual counters and sync processes
     vga_inst : vga_timing_1080p
     port map (
-        clk_pxl  => pxl_clk,    -- Connect 148.5MHz clock
-        h_sync   => VGA_HS_O,   -- Connect directly to Output Port
-        v_sync   => VGA_VS_O,   -- Connect directly to Output Port
-        pixel_x  => h_cntr_reg, -- Wire internal x to your existing signal
-        pixel_y  => v_cntr_reg, -- Wire internal y to your existing signal
-        video_on => active      -- Wire video active to your existing signal
+        clk_pxl  => pxl_clk,
+        h_sync   => VGA_HS_O,
+        v_sync   => VGA_VS_O,
+        pixel_x  => h_cntr_reg,
+        pixel_y  => v_cntr_reg,
+        video_on => active
     );
     
     
     -------------------------------------------------------------------------
-    -- INSTANCE: DRAWING ENGINE
+    -- Graphics Renderer
     -------------------------------------------------------------------------
     draw_inst : draw
     port map (
         clk_pxl    => pxl_clk,
-        video_on   => active,      -- Connect to the signal from VGA module
-        pixel_x    => h_cntr_reg,  -- Connect to signal from VGA module
-        pixel_y    => v_cntr_reg,  -- Connect to signal from VGA module
+        video_on   => active,
+        pixel_x    => h_cntr_reg,
+        pixel_y    => v_cntr_reg,
         
-        -- Connect Game Objects
+        -- Game object positions
         ball_x     => ball_x,
         ball_y     => ball_y,
         pad_l_y    => pad_l_y,
@@ -121,35 +119,36 @@ begin
         score_r    => score_r,
         lives      => lives,
         
-        -- Connect State Helper
         game_state => state,
         
-        -- Connect Physical Outputs
+        -- VGA color outputs
         vga_r      => VGA_R,
         vga_g      => VGA_G,
         vga_b      => VGA_B
     );
 
     -------------------------------------------------------------------------
-    --INSTANCE: GAME LOGIC 
+    -- Game Physics and Logic Controller
     -------------------------------------------------------------------------
     logic_inst : game_logic
     port map (
-        clk_pxl   => pxl_clk,
-        rst       => sw(0),      -- Map Switch 0 to Reset
-        LEFT_P_UP       => LEFT_P_UP,        -- Map Buttons
-        LEFT_P_DOWN     => LEFT_P_DOWN,
-        RIGHT_P_UP      => RIGHT_P_UP,
-        RIGHT_P_DOWN    => RIGHT_P_DOWN,
+        clk_pxl        => pxl_clk,
+        rst            => RESET,
+        LEFT_P_UP      => LEFT_P_UP,
+        LEFT_P_DOWN    => LEFT_P_DOWN,
+        RIGHT_P_UP     => RIGHT_P_UP,
+        RIGHT_P_DOWN   => RIGHT_P_DOWN,
         
-        -- Outputs (Driving the wires)
-        ball_x    => ball_x,
-        ball_y    => ball_y,
-        pad_l_y   => pad_l_y,
-        pad_r_y   => pad_r_y,
-        score_l   => score_l,
-        score_r   => score_r,
-        lives     => lives,
+        -- Position outputs
+        ball_x         => ball_x,
+        ball_y         => ball_y,
+        pad_l_y        => pad_l_y,
+        pad_r_y        => pad_r_y,
+        
+        -- Game state outputs
+        score_l        => score_l,
+        score_r        => score_r,
+        lives          => lives,
         game_state_out => state
     );
     

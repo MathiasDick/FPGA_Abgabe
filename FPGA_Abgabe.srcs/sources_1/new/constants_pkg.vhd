@@ -1,46 +1,42 @@
+----------------------------------------------------------------------------------
+-- Constants Package
+-- 
+-- DESCRIPTION:
+-- Central location for all game constants, type definitions, and component
+-- declarations. Ensures consistency across all modules.
+----------------------------------------------------------------------------------
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 
 package constants_pkg is
 
     -------------------------------------------------------------------------
-    -- 1. STATE MACHINE
+    -- State Machine Type Definition
     -------------------------------------------------------------------------
     type state_type is (WELCOME, SERVE, PLAY, GAMEOVER);
 
     -------------------------------------------------------------------------
-    -- 2. GAME CONSTANTS (Single Source of Truth)
+    -- Game Constants
     -------------------------------------------------------------------------
-    -- Screen Dimensions
+    -- Display dimensions
     constant FRAME_WIDTH   : natural := 1920;
     constant FRAME_HEIGHT  : natural := 1080;
     
-    -- Object Dimensions
-    constant BALL_SIZE     : natural := 20;
-    constant PADDLE_W      : natural := 25;
-    constant PADDLE_H      : natural := 180;
-    constant PADDLE_OFFSET : natural := 60;
+    -- Game object dimensions
+    constant BALL_SIZE     : natural := 20;  -- Ball width and height
+    constant PADDLE_W      : natural := 25;  -- Paddle width
+    constant PADDLE_H      : natural := 180; -- Paddle height
+    constant PADDLE_OFFSET : natural := 60;  -- Paddle distance from screen edge
     
-    -- Game Settings
-    constant MAX_LIVES     : natural := 3;
+    -- Game rules
+    constant MAX_LIVES     : natural := 3;   -- Total lives per game
     
-    -- SPEED CONTROL (Frequency Dividers)
-    -- 2,500,000 = ~60 updates per second (Standard)
-    -- 1,250,000 = ~120 updates per second (Fast)
-    constant BALL_CLK_DIV   : natural := 480000; -- Ball moves slightly faster
-    constant PADDLE_CLK_DIV : natural := 600000; -- Paddles move standard speed
-    -------------------------------------------------------------------------
-    -- 3. COLOR PALETTE (4-bit per channel)
-    -------------------------------------------------------------------------
-    constant C_WHITE   : std_logic_vector(3 downto 0) := "1111";
-    constant C_BLACK   : std_logic_vector(3 downto 0) := "0000";
-    constant C_RED     : std_logic_vector(3 downto 0) := "1111"; -- Adjust if using RGB vs VGA port mapping
-    constant C_GREEN   : std_logic_vector(3 downto 0) := "1111"; 
-    constant C_BLUE    : std_logic_vector(3 downto 0) := "1111"; 
-    -- (Note: You previously used "0011" for dark blue, adjust as you see fit)
+    -- Movement speed control (clock dividers)
+    constant BALL_CLK_DIV   : natural := 480000;  -- Ball update frequency (~309 Hz at 148.5 MHz)
+    constant PADDLE_CLK_DIV : natural := 600000;  -- Paddle update frequency (~247 Hz at 148.5 MHz)
 
     -------------------------------------------------------------------------
-    -- 4. COMPONENT DECLARATIONS (Cleans up Top Level)
+    -- Component Declarations
     -------------------------------------------------------------------------
     component vga_timing_1080p
     Port ( clk_pxl  : in  STD_LOGIC;
@@ -63,7 +59,7 @@ package constants_pkg is
            score_l    : in  integer;
            score_r    : in  integer;
            lives      : in  integer;
-           game_state : in  state_type; -- Uses the type defined above!
+           game_state : in  state_type;
            vga_r      : out STD_LOGIC_VECTOR(3 downto 0);
            vga_b      : out STD_LOGIC_VECTOR(3 downto 0);
            vga_g      : out STD_LOGIC_VECTOR(3 downto 0));
@@ -91,5 +87,5 @@ package constants_pkg is
 end package constants_pkg;
 
 package body constants_pkg is
-    -- Nothing needed here for simple constants
+    -- Package body not required for constants and type definitions
 end package body constants_pkg;

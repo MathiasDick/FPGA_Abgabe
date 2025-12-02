@@ -1,6 +1,17 @@
+----------------------------------------------------------------------------------
+-- Graphics Renderer
+-- 
+-- DESCRIPTION:
+-- Renders all visual elements of the Pong game including:
+-- - Ball and paddles with hit-box detection
+-- - Score display using bitmap font ROM
+-- - Lives indicator
+-- - Welcome screen and Game Over text
+-- - State-dependent background colors
+----------------------------------------------------------------------------------
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
-use IEEE.NUMERIC_STD.ALL; -- Required for coordinate math
+use IEEE.NUMERIC_STD.ALL;
 use work.constants_pkg.all;
 
 entity draw is
@@ -18,8 +29,7 @@ entity draw is
            score_r  : in  integer;
            lives    : in  integer;
            
-           -- NEW: We need to know the state to change background color!
-           -- 0=WELCOME, 1=PLAY/SERVE, 2=GAMEOVER
+           -- Current game state for background color
            game_state : in state_type; 
 
            -- RGB Output
@@ -30,42 +40,51 @@ end draw;
 
 architecture Behavioral of draw is
 
-    -- "Score" Values
-    constant SCORE_SCALE : natural := 8; 
-    constant UPPER_Y_BORDER : natural := 50; -- pixel on y axis for upper border
-    constant LOWER_Y_BORDER : natural := 114; -- pixel on y axis for lower border
-    constant LEFT_X_BORDER_L : natural := 300; -- left paddle left border on x axis
-    constant LEFT_X_BORDER_R : natural := 364; -- left paddle right border on x axis
-    constant RIGHT_X_BORDER_L : natural := 1500; -- right paddle left border on x axis
-    constant RIGHT_X_BORDER_R : natural := 1564; -- right paddle right border on x axis
+    -------------------------------------------------------------------------
+    -- CONSTANTS: Score Display Configuration
+    -------------------------------------------------------------------------
+    constant SCORE_SCALE : natural := 8;         -- Scaling factor for score digits
+    constant SCORE_ZONE_TOP : natural := 50;     -- Upper Y boundary of score area
+    constant SCORE_ZONE_BOTTOM : natural := 114; -- Lower Y boundary of score area
+    constant LEFT_X_BORDER_L : natural := 300;   -- Left score left X boundary
+    constant LEFT_X_BORDER_R : natural := 364;   -- Left score right X boundary
+    constant RIGHT_X_BORDER_L : natural := 1500; -- Right score left X boundary
+    constant RIGHT_X_BORDER_R : natural := 1564; -- Right score right X boundary    
     
-    -- "Welcome" Values
-    constant CHAR_WIDTH  : natural := 32;
-    constant LETTERS     : natural := 7;
-    constant WORD_WIDTH  : natural := CHAR_WIDTH * LETTERS;
-    constant LETTERS_UPPER_Y_BORDER : natural := 400;
-    constant LETTERS_LOWER_Y_BORDER : natural := 432;
-    constant COORD_BITS : natural := 12; -- bit length of pixel coordinates
-    constant WELCOME_MAX_POS : natural := 6;
-    constant FONT_MAX_COL : natural := 7;
-    constant TEXT_SCALE : natural := 4;
+    -------------------------------------------------------------------------
+    -- CONSTANTS: Welcome Screen Text Configuration
+    -------------------------------------------------------------------------
+    constant CHAR_WIDTH  : natural := 32;        -- Width of each character in pixels
+    constant LETTERS     : natural := 7;         -- Number of letters in "WELCOME"
+    constant WORD_WIDTH  : natural := CHAR_WIDTH * LETTERS; -- Total width of "WELCOME" text
+    constant WELCOME_X : natural := (FRAME_WIDTH - WORD_WIDTH) / 2; -- Centered X position for "WELCOME"
+    constant LETTERS_UPPER_Y_BORDER : natural := 400; -- Upper Y boundary for text rendering
+    constant LETTERS_LOWER_Y_BORDER : natural := 432; -- Lower Y boundary for text rendering
+    constant COORD_BITS : natural := 12;         -- Bit width of pixel coordinates
+    constant WELCOME_MAX_POS : natural := 6;     -- Maximum character position (0-6 for 7 chars)
+    constant FONT_MAX_COL : natural := 7;        -- Maximum column index in font bitmap
+    constant TEXT_SCALE : natural := 4;          -- Scaling factor for text size
     
-    -- "Game Over" Values
-    constant GO_LETTERS : natural := 9; -- "GAME OVER" is 9 chars (including space)
-    constant GO_WIDTH : natural := CHAR_WIDTH * GO_LETTERS;
-    constant GO_X : natural := (FRAME_WIDTH - GO_WIDTH) / 2;
-    constant GO_MAX_POS : natural := 8;
+    -------------------------------------------------------------------------
+    -- CONSTANTS: Game Over Screen Configuration
+    -------------------------------------------------------------------------
+    constant GO_LETTERS : natural := 9;          -- Number of characters in "GAME OVER" (with space)
+    constant GO_WIDTH : natural := CHAR_WIDTH * GO_LETTERS; -- Total width of "GAME OVER" text
+    constant GO_X : natural := (FRAME_WIDTH - GO_WIDTH) / 2; -- Centered X position for "GAME OVER"
+    constant GO_MAX_POS : natural := 8;          -- Maximum character position (0-8 for 9 chars)
     
-    constant WELCOME_X : natural := (FRAME_WIDTH - WORD_WIDTH) / 2;
     
-    constant L_SIZE    : integer := 20;  -- 16x16 pixel squares
-    constant L_Y_START : integer := 57;  -- Vertical Position
-    constant L_GAP     : integer := 25;  -- Distance between balls
-    
-    constant L_X_START   : integer := (FRAME_WIDTH - ((2 * L_GAP) + L_SIZE)) / 2;
+    -------------------------------------------------------------------------
+    -- CONSTANTS: Lives Display Configuration
+    -------------------------------------------------------------------------
+    constant L_SIZE    : integer := 20;          -- Size of each life indicator square (20x20 pixels)
+    constant L_Y_START : integer := 57;          -- Y position for lives display at top of screen
+    constant L_GAP     : integer := 25;          -- Horizontal spacing between life indicators
+    constant L_X_START : integer := (FRAME_WIDTH - ((2 * L_GAP) + L_SIZE)) / 2; -- Centered X start position
 
-
-    -- 1. DEFINE FONT TYPES AND CONSTANTS (The "Visual" Bitmap)
+    -------------------------------------------------------------------------
+    -- FONT ROM: Character Bitmap Definitions
+    -------------------------------------------------------------------------
     type char_bitmap_type is array (0 to 7) of std_logic_vector(7 downto 0);
     type font_rom_type is array (0 to 15) of char_bitmap_type;
 
@@ -77,7 +96,7 @@ architecture Behavioral of draw is
                 "01100110", 
                 "01100110", 
                 "00111100", 
-                "00000000"),
+                "00000000"), -- 0
                 
         1 =>   ("00011000", 
                 "00111000", 
@@ -86,7 +105,7 @@ architecture Behavioral of draw is
                 "00011000", 
                 "00011000", 
                 "00111110", 
-                "00000000"),
+                "00000000"), -- 1
                 
         2 =>   ("00111100", 
                 "01100110", 
@@ -95,7 +114,7 @@ architecture Behavioral of draw is
                 "00110000", 
                 "01100000", 
                 "01111110", 
-                "00000000"),
+                "00000000"), -- 2
                 
         3 =>   ("00111100", 
                 "01100110", 
@@ -104,7 +123,7 @@ architecture Behavioral of draw is
                 "00000110", 
                 "01100110", 
                 "00111100", 
-                "00000000"),
+                "00000000"), -- 3
                 
         4 =>  ("11000110", 
                "11000110", 
@@ -113,7 +132,7 @@ architecture Behavioral of draw is
                "11111110", 
                "11101110", 
                "11000110", 
-               "00000000"), --W
+               "00000000"), -- W
                 
         5 =>  ("11111110", 
                "11000000", 
@@ -122,7 +141,7 @@ architecture Behavioral of draw is
                "11000000", 
                "11000000", 
                "11111110", 
-               "00000000"), --E
+               "00000000"), -- E
                 
         6 =>  ("11000000", 
                "11000000", 
@@ -131,7 +150,7 @@ architecture Behavioral of draw is
                "11000000", 
                "11000000", 
                "11111110", 
-               "00000000"), --L
+               "00000000"), -- L
                 
         7 =>  ("01111110", 
                "11000010", 
@@ -140,7 +159,7 @@ architecture Behavioral of draw is
                "11000000", 
                "11000010", 
                "01111110", 
-               "00000000"), --C
+               "00000000"), -- C
                 
         8 =>  ("01111100", 
                "11000110", 
@@ -149,7 +168,7 @@ architecture Behavioral of draw is
                "11000110", 
                "11000110", 
                "01111100", 
-               "00000000"), --O
+               "00000000"), -- O
                 
         9 =>  ("11000110", 
                "11101110", 
@@ -158,7 +177,7 @@ architecture Behavioral of draw is
                "11000110", 
                "11000110", 
                "11000110", 
-               "00000000"), --M
+               "00000000"), -- M
    
         10 => ("01111110", 
                "11000010", 
@@ -167,7 +186,7 @@ architecture Behavioral of draw is
                "11000110", 
                "11000110", 
                "01111110", 
-               "00000000"), --G
+               "00000000"), -- G
     
         11 => ("01111100", 
                "11000110", 
@@ -176,7 +195,7 @@ architecture Behavioral of draw is
                "11000110", 
                "11000110", 
                "11000110", 
-               "00000000"), --A
+               "00000000"), -- A
     
         12 => ("11000110", 
                "11000110", 
@@ -185,7 +204,7 @@ architecture Behavioral of draw is
                "01101100", 
                "00111000", 
                "00010000", 
-               "00000000"), --V
+               "00000000"), -- V
     
         13 => ("11111100", 
                "11000110", 
@@ -194,28 +213,30 @@ architecture Behavioral of draw is
                "11110000", 
                "11011000", 
                "11001110", 
-               "00000000"), --R
+               "00000000"), -- R
                         
         others => (others => (others => '0'))
     );
 
+    -------------------------------------------------------------------------
     -- INTERNAL SIGNALS
+    -------------------------------------------------------------------------
+    -- Pixel coordinates as integers for easier arithmetic
     signal pix_x, pix_y : integer;
 
-
-    -- DRAW FLAGS
+    -- Object visibility flags for priority rendering
     signal draw_ball, draw_pad_l, draw_pad_r, draw_lives : std_logic;
     signal draw_text : std_logic;
 
 begin
 
-    -- 1. CONVERT INPUTS TO INTEGERS
+    -- Convert pixel coordinates to integers for arithmetic operations
     pix_x <= to_integer(unsigned(pixel_x));
     pix_y <= to_integer(unsigned(pixel_y));
 
 
     -------------------------------------------------------------------------
-    -- 2. OBJECT GENERATION (Hit Box Logic)
+    -- OBJECT GENERATION (Hit Box Logic)
     -------------------------------------------------------------------------
     -- Ball
     draw_ball <= '1' when (pix_x >= ball_x and pix_x < ball_x + BALL_SIZE) and
@@ -229,7 +250,7 @@ begin
     draw_pad_r <= '1' when (pix_x >= (FRAME_WIDTH - PADDLE_OFFSET - PADDLE_W) and pix_x < (FRAME_WIDTH - PADDLE_OFFSET)) and
                            (pix_y >= pad_r_y and pix_y < pad_r_y + PADDLE_H) else '0';
 
-    -- Live Balls
+    -- Lives display: hit box for all three life indicators
     draw_lives <= '1' when 
         -- Ball 1
         (lives >= 1 and (pix_x >= L_X_START and pix_x < L_X_START + L_SIZE) 
@@ -246,17 +267,18 @@ begin
 
 
     -------------------------------------------------------------------------
-    -- 3. TEXT ENGINE (Scores & Welcome)
+    -- Text Rendering Engine: Scores, Welcome Screen, and Game Over
+    -- Uses bitmap font ROM to render characters pixel by pixel
     -------------------------------------------------------------------------
     process(pix_x, pix_y, score_l, score_r, game_state)
-        variable scaled_y    : integer range 0 to 7;
-        variable char_col    : integer;
-        variable char_idx    : integer range 0 to 15;
-        variable text_active : boolean;
-        variable welcome_pos : integer;
-        variable rel_x       : unsigned(11 downto 0);
+        variable scaled_y    : integer range 0 to 7;    -- Row within character bitmap
+        variable char_col    : integer;                 -- Column within character bitmap
+        variable char_idx    : integer range 0 to 15;   -- Index into FONT_ROM
+        variable text_active : boolean;                 -- Flag if we're in a text region
+        variable welcome_pos : integer;                 -- Character position in string
+        variable rel_x       : unsigned(11 downto 0);   -- Relative X position within text
     begin
-        -- Defaults
+        -- Default: no text rendering
         draw_text   <= '0';
         scaled_y    := 0;
         char_col    := 0;
@@ -264,27 +286,27 @@ begin
         text_active := false;
         
         -- A. DRAW LEFT SCORE
-        if (pix_y >= UPPER_Y_BORDER and pix_y < LOWER_Y_BORDER) and (pix_x >= LEFT_X_BORDER_L and pix_x < LEFT_X_BORDER_R) then
+        if (pix_y >= SCORE_ZONE_TOP and pix_y < SCORE_ZONE_BOTTOM) and (pix_x >= LEFT_X_BORDER_L and pix_x < LEFT_X_BORDER_R) then
             char_idx    := score_l;
-            scaled_y    := (pix_y - UPPER_Y_BORDER) / SCORE_SCALE;
+            scaled_y    := (pix_y - SCORE_ZONE_TOP) / SCORE_SCALE;
             char_col    := (pix_x - LEFT_X_BORDER_L) / SCORE_SCALE;
             text_active := true;
             
         -- B. DRAW RIGHT SCORE
-        elsif (pix_y >= UPPER_Y_BORDER and pix_y < LOWER_Y_BORDER) and (pix_x >= RIGHT_X_BORDER_L and pix_x < RIGHT_X_BORDER_R) then
+        elsif (pix_y >= SCORE_ZONE_TOP and pix_y < SCORE_ZONE_BOTTOM) and (pix_x >= RIGHT_X_BORDER_L and pix_x < RIGHT_X_BORDER_R) then
             char_idx    := score_r;
-            scaled_y    := (pix_y - UPPER_Y_BORDER) / SCORE_SCALE;
+            scaled_y    := (pix_y - SCORE_ZONE_TOP) / SCORE_SCALE;
             char_col    := (pix_x - RIGHT_X_BORDER_L) / SCORE_SCALE;
             text_active := true;
             
--- C. DRAW "WELCOME" (Only in WELCOME)
+        -- C. DRAW "WELCOME" TEXT (Only visible in WELCOME state)
         elsif (game_state = WELCOME) and (pix_y >= LETTERS_UPPER_Y_BORDER and pix_y < LETTERS_LOWER_Y_BORDER) then
             if (pix_x >= WELCOME_X and pix_x < WELCOME_X + WORD_WIDTH) then
                 
-                -- 1. Calculate Relative X (Distance from start of word)
+                -- Calculate position within the word
                 rel_x := to_unsigned(pix_x - WELCOME_X, COORD_BITS);
                 
-                -- 2. Bit Slice for Index: Dividing by 32 means looking at bits 5 and up
+                -- Determine which character we're in (divide by 32 using bit slice)
                 welcome_pos := to_integer(rel_x(11 downto 5)); 
                 
                 case welcome_pos is
@@ -301,21 +323,21 @@ begin
                 if welcome_pos <= WELCOME_MAX_POS then
                     scaled_y := (pix_y - LETTERS_UPPER_Y_BORDER) / TEXT_SCALE;
                     
-                    -- 3. Bit Slice for Column: Bits 4..2 represent (val % 32) / 4
+                    -- Calculate column within character (bits 4..2 = (val mod 32) / 4)
                     char_col := to_integer(rel_x(4 downto 2));
                     
                     text_active := (char_col <= FONT_MAX_COL); 
                 end if;
             end if;
 
-        -- D. DRAW "GAME OVER" (Only in GAMEOVER state)
+        -- D. DRAW "GAME OVER" TEXT (Only visible in GAMEOVER state)
         elsif (game_state = GAMEOVER) and (pix_y >= LETTERS_UPPER_Y_BORDER and pix_y < LETTERS_LOWER_Y_BORDER) then
             if (pix_x >= GO_X and pix_x < GO_X + GO_WIDTH) then
                 
-                -- 1. Calculate Relative X
+                -- Calculate position within the text
                 rel_x := to_unsigned(pix_x - GO_X, COORD_BITS);
                 
-                -- 2. Bit Slice for Index
+                -- Determine which character we're in
                 welcome_pos := to_integer(rel_x(11 downto 5)); 
 
                 case welcome_pos is
@@ -334,7 +356,7 @@ begin
                 if welcome_pos <= GO_MAX_POS then
                     scaled_y := (pix_y - LETTERS_UPPER_Y_BORDER) / TEXT_SCALE;
                     
-                    -- 3. Bit Slice for Column
+                    -- Calculate column within character
                     char_col := to_integer(rel_x(4 downto 2));
                     
                     text_active := (char_col <= FONT_MAX_COL); 
@@ -342,10 +364,9 @@ begin
             end if;
         end if;
         
-        
-        -- D. RENDER PIXEL FROM ROM
+        -- E. RENDER PIXEL FROM FONT ROM
+        -- Check if the current pixel should be lit based on the character bitmap
         if text_active and (char_col >= 0 and char_col <= FONT_MAX_COL) then
-            -- Check the bit in the constant array
             if FONT_ROM(char_idx)(scaled_y)(FONT_MAX_COL - char_col) = '1' then
                 draw_text <= '1';
             end if;
@@ -354,43 +375,65 @@ begin
     end process;
 
     -------------------------------------------------------------------------
-    -- 4. COLOR MUX (PRIORITY ENCODER)
+    -- Color Multiplexer: Priority-Based Rendering
+    -- Determines final RGB output based on which objects are visible
     -------------------------------------------------------------------------
-    process (video_on, draw_text, draw_ball, draw_pad_l, draw_pad_r, draw_lives, game_state)
+    process (clk_pxl)
     begin
-        if video_on = '0' then
-            vga_r <= C_BLACK; vga_g <= C_BLACK; vga_b <= C_BLACK;
-        else
-            -- Priority 1: Text (White)
-            if draw_text = '1' then
-                vga_r <= C_WHITE; vga_g <= C_WHITE; vga_b <= C_WHITE;
-                
-            -- Priority 2: Ball (White)
-            elsif draw_ball = '1' then
-                vga_r <= C_WHITE; vga_g <= C_WHITE; vga_b <= C_WHITE;
-
-            -- Priority 3: Left Paddle (Cyan)
-            elsif draw_pad_l = '1' then
-                vga_r <= "0000"; vga_g <= C_GREEN; vga_b <= C_BLUE; 
-
-            -- Priority 4: Right Paddle (Magenta)
-            elsif draw_pad_r = '1' then
-                vga_r <= C_RED; vga_g <= "0000"; vga_b <= C_BLUE; 
-
-            -- Priority 5: Life Bar (Green)
-            elsif draw_lives = '1' then
-                vga_r <= "1111"; vga_g <= "0100"; vga_b <= "0100"; 
-                
-            -- Priority 6: Background (Depends on State)
+        if rising_edge(clk_pxl) then
+            -- Default: Black when video is off
+            if video_on = '0' then
+                vga_r <= "0000";
+                vga_g <= "0000"; 
+                vga_b <= "0000";
             else
-                case game_state is
-                    when WELCOME => -- WELCOME (Blue)
-                        vga_r <= "0000"; vga_g <= "0000"; vga_b <= "0011";
-                    when GAMEOVER => -- GAMEOVER (Red)
-                        vga_r <= "0011"; vga_g <= "0000"; vga_b <= "0000";
-                    when others => -- PLAY/SERVE (Black)
-                        vga_r <= C_BLACK; vga_g <= C_BLACK; vga_b <= C_BLACK;
-                end case;
+                -- Priority 1: Text (White)
+                if draw_text = '1' then
+                    vga_r <= "1111";
+                    vga_g <= "1111"; 
+                    vga_b <= "1111";
+                    
+                -- Priority 2: Ball (White)
+                elsif draw_ball = '1' then
+                    vga_r <= "1111";
+                    vga_g <= "1111"; 
+                    vga_b <= "1111";
+
+                -- Priority 3: Left Paddle (Cyan)
+                elsif draw_pad_l = '1' then
+                    vga_r <= "0000";
+                    vga_g <= "1111"; 
+                    vga_b <= "1111";
+
+                -- Priority 4: Right Paddle (Magenta)
+                elsif draw_pad_r = '1' then
+                    vga_r <= "1111";
+                    vga_g <= "0000"; 
+                    vga_b <= "1111";
+
+                -- Priority 5: Lives indicator (Orange-red)
+                elsif draw_lives = '1' then
+                    vga_r <= "1111";
+                    vga_g <= "0100"; 
+                    vga_b <= "0100"; 
+                    
+                -- Priority 6: Background (State-dependent color)
+                else
+                    case game_state is
+                        when WELCOME =>
+                            vga_r <= "0000";
+                            vga_g <= "0000"; 
+                            vga_b <= "0011"; -- Blue
+                        when GAMEOVER =>
+                            vga_r <= "0011";
+                            vga_g <= "0000"; 
+                            vga_b <= "0000"; -- Dark red
+                        when others =>
+                            vga_r <= "0000";
+                            vga_g <= "0000"; 
+                            vga_b <= "0000"; -- Black (PLAY/SERVE)
+                    end case;
+                end if;
             end if;
         end if;
     end process;
