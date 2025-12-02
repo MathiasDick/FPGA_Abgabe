@@ -80,8 +80,8 @@ package constants_pkg is
            ball_y    : out integer range 0 to 4095;
            pad_l_y   : out integer range 0 to 4095;
            pad_r_y   : out integer range 0 to 4095;
-           score_l   : out integer range 0 to 9;
-           score_r   : out integer range 0 to 9;
+           score_l   : out integer range 0 to 3;
+           score_r   : out integer range 0 to 3;
            lives     : out integer range 0 to 3;
            game_state_out : out state_type
            );

@@ -73,8 +73,8 @@ architecture Behavioral of top is
     
     -- Scoring & Lives
     signal lives : integer range 0 to 3 := 3; -- Total Balls per session
-    signal score_l : integer range 0 to 9 := 0;
-    signal score_r : integer range 0 to 9 := 0;
+    signal score_l : integer range 0 to 3 := 0;
+    signal score_r : integer range 0 to 3 := 0;
 
 
 begin

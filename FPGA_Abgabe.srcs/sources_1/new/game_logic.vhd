@@ -5,7 +5,7 @@ use work.constants_pkg.all; -- Imports constants and state_type
 
 entity game_logic is
     Port ( clk_pxl   : in  STD_LOGIC;
-           rst       : in  STD_LOGIC; -- Mapped to sw(0) in top
+           rst       : in  STD_LOGIC; -- Mapped to sw(0) in top.vhd
            LEFT_P_UP : in STD_LOGIC;
            LEFT_P_DOWN : in STD_LOGIC;
            RIGHT_P_UP : in STD_LOGIC;
@@ -17,8 +17,8 @@ entity game_logic is
            pad_l_y   : out integer range 0 to 4095;
            pad_r_y   : out integer range 0 to 4095;
            
-           score_l   : out integer range 0 to 9;
-           score_r   : out integer range 0 to 9;
+           score_l   : out integer range 0 to 3;
+           score_r   : out integer range 0 to 3;
            lives     : out integer range 0 to 3;
            
            -- We changed this from 'integer' to 'state_type' 
@@ -58,7 +58,7 @@ architecture Behavioral of game_logic is
     
     -- Scoring
     signal lives_reg : integer range 0 to 3 := 3;
-    signal sc_l, sc_r : integer range 0 to 9 := 0;
+    signal sc_l, sc_r : integer range 0 to 3 := 0;
 
     -- Physics Timing
     signal ball_tick    : std_logic;
@@ -164,7 +164,7 @@ begin
                                     b_dx <= '0'; -- Bounce
                                 -- Missed?
                                 elsif b_x >= (FRAME_WIDTH - BALL_SIZE - SAFETY_MARGIN) then
-                                    if sc_l < 9 then sc_l <= sc_l + 1; end if;
+                                    if sc_l < 3 then sc_l <= sc_l + 1; end if;
                                     
                                     if lives_reg = 1 then 
                                         lives_reg <= 0; state <= GAMEOVER; 
@@ -181,7 +181,7 @@ begin
                                     b_dx <= '1'; -- Bounce
                                 -- Missed?
                                 elsif b_x <= SAFETY_MARGIN then
-                                    if sc_r < 9 then sc_r <= sc_r + 1; end if;
+                                    if sc_r < 3 then sc_r <= sc_r + 1; end if;
                                     
                                     if lives_reg = 1 then 
                                         lives_reg <= 0; state <= GAMEOVER; 
